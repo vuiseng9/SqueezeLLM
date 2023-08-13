@@ -9,6 +9,7 @@ from squeezellm.quant import *
 
 import pickle
 import json
+import os
 
 def get_llama(model):
     import torch
@@ -104,6 +105,21 @@ def llama_eval(model, testenc, dev):
 
     model.config.use_cache = use_cache
 
+def show_layer_wise_numel(model):
+    FC_KEYWORDS = ['self_attn', 'mlp']
+    total_numel = 0
+    fc_numel = 0
+    for n, p in model.named_parameters():
+        total_numel += p.numel()
+        print(f"{p.numel():15,} | {n}")
+    
+        if any(map(lambda x: x in n, FC_KEYWORDS)):
+            fc_numel += p.numel()
+    
+    print(f"\n{total_numel:15,} | total numel")
+    print(f"{fc_numel:15,} | fc-only numel")
+    print(f"{total_numel-fc_numel:15,} | residual")
+        
 # function for loading packed checkpoint
 def load_quant(model, checkpoint, wbits):
     from transformers import LlamaForCausalLM
@@ -241,6 +257,8 @@ if __name__ == '__main__':
     else:
         model = get_llama(args.model)
         model.eval()
+    
+    show_layer_wise_numel(model)
 
     dataloader, testloader = get_loaders(
         args.dataset, nsamples=args.nsamples, seed=args.seed, model=args.model, seqlen=model.seqlen
